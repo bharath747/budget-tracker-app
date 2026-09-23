@@ -1,5 +1,9 @@
 package com.bharath.budgettracker
 import android.os.Bundle
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
@@ -67,7 +71,56 @@ class MainActivity:ComponentActivity(){override fun onCreate(b:Bundle?){super.on
  AlertDialog(onDismissRequest=close,title={Text("Add Lend")},text={Column{OutlinedTextField(n,{n=it},label={Text("Person / purpose")});OutlinedTextField(a,{a=it},label={Text("Amount")});OutlinedTextField(r,{r=it},label={Text("Annual interest %")})}},confirmButton={Button({a.toDoubleOrNull()?.let{vm.addLending(n,it,0.0,r.toDoubleOrNull()?:0.0)};close()}){Text("Save")}},dismissButton={TextButton(close){Text("Cancel")}})
 }
 @Composable fun Admin(vm:BudgetViewModel){
- val sources by vm.sources.collectAsState(emptyList());val filters by vm.filters.collectAsState(emptyList());var s by remember{mutableStateOf("")};var f by remember{mutableStateOf("")};var initial by remember{mutableStateOf("")}
- Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){Text("Admin",style=MaterialTheme.typography.headlineSmall);OutlinedTextField(initial,{initial=it},label={Text("Initial balance")});Button({initial.toDoubleOrNull()?.let{vm.setInitialAmount(it,System.currentTimeMillis())}}){Text("Set initial balance")};OutlinedTextField(s,{s=it},label={Text("New source")});Button({vm.addSource(s);s=""}){Text("Add source")};Text("Sources: "+sources.joinToString{it.name});OutlinedTextField(f,{f=it},label={Text("Exclude keyword")});Button({vm.addFilter(f);f=""}){Text("Add filter")};Text("Filters: "+filters.joinToString{it.word})}
-}
-fun date(ms:Long)=SimpleDateFormat("dd MMM yyyy",Locale.getDefault()).format(Date(ms))
+ val context=LocalContext.current
+ val sources by vm.sources.collectAsState(emptyList())
+ val filters by vm.filters.collectAsState(emptyList())
+ var s by remember{mutableStateOf("")};var f by remember{mutableStateOf("")};var initial by remember{mutableStateOf("")}
+ var showDelete by remember{mutableStateOf(false)}
+ val backupLauncher=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")){uri->
+  if(uri!=null) try{context.contentResolver.openOutputStream(uri)?.use{it.write(vm.backupJson().toByteArray())};Toast.makeText(context,"Backup saved",Toast.LENGTH_SHORT).show()}catch(e:Exception){Toast.makeText(context,"Backup failed",Toast.LENGTH_LONG).show()}
+ }
+ val restoreLauncher=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()){uri->
+  if(uri!=null) try{
+   val json=context.contentResolver.openInputStream(uri)?.bufferedReader()?.use{it.readText()} ?: ""
+   vm.restoreJson(json){ok,msg->Toast.makeText(context,msg,Toast.LENGTH_LONG).show()}
+  }catch(e:Exception){Toast.makeText(context,"Could not read backup file",Toast.LENGTH_LONG).show()}
+ }
+ Column(Modifier.padding(16.dp).fillMaxSize(),verticalArrangement=Arrangement.spacedBy(12.dp)){
+  Text("Settings & Data",style=MaterialTheme.typography.headlineSmall)
+  Card(Modifier.fillMaxWidth()){Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
+   Text("Starting balance",style=MaterialTheme.typography.titleMedium)
+   OutlinedTextField(initial,{initial=it},label={Text("Initial balance")},modifier=Modifier.fillMaxWidth())
+   Button({initial.toDoubleOrNull()?.let{vm.setInitialAmount(it,System.currentTimeMillis())}},modifier=Modifier.fillMaxWidth()){Text("Save starting balance")}
+  }}
+  Card(Modifier.fillMaxWidth()){Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
+   Text("Backup & restore",style=MaterialTheme.typography.titleMedium)
+   Text("Keep a copy of your transactions, loans, lending records, sources and filters.")
+   Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)){
+    OutlinedButton({backupLauncher.launch("budget-tracker-backup.json")},Modifier.weight(1f)){Text("Backup")}
+    Button({restoreLauncher.launch(arrayOf("application/json","text/plain"))},Modifier.weight(1f)){Text("Restore")}
+   }
+  }}
+  Card(Modifier.fillMaxWidth()){Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
+   Text("Sources",style=MaterialTheme.typography.titleMedium)
+   Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){OutlinedTextField(s,{s=it},label={Text("New source")},modifier=Modifier.weight(1f));Button({vm.addSource(s);s=""}){Text("Add")}}
+   Text(sources.joinToString(" • "){it.name},style=MaterialTheme.typography.bodySmall)
+  }}
+  Card(Modifier.fillMaxWidth()){Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
+   Text("Analytics filters",style=MaterialTheme.typography.titleMedium)
+   Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){OutlinedTextField(f,{f=it},label={Text("Exclude keyword")},modifier=Modifier.weight(1f));Button({vm.addFilter(f);f=""}){Text("Add")}}
+   Text(filters.joinToString(" • "){it.word},style=MaterialTheme.typography.bodySmall)
+  }}
+  Card(Modifier.fillMaxWidth()){Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
+   Text("Danger zone",style=MaterialTheme.typography.titleMedium)
+   Text("Permanently removes all transactions, loans, lending records, payments, sources and filters from this device.")
+   OutlinedButton({showDelete=true},modifier=Modifier.fillMaxWidth()){Text("Delete all data")}
+  }}
+ }
+ if(showDelete)AlertDialog(
+  onDismissRequest={showDelete=false},
+  title={Text("Delete all data?")},
+  text={Text("This cannot be undone. If you need the data later, create a backup first.")},
+  confirmButton={Button({showDelete=false;vm.deleteAllData{ok->Toast.makeText(context,if(ok)"All data deleted" else "Delete failed",Toast.LENGTH_LONG).show()}}){Text("Delete permanently")}},
+  dismissButton={TextButton({showDelete=false}){Text("Cancel")}}
+ )
+})
