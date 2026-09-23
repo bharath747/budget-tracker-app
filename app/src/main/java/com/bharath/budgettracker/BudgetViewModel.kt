@@ -21,8 +21,8 @@ class BudgetViewModel(app:Application):AndroidViewModel(app){
  val initialDate=MutableStateFlow(prefs.getLong("initialDate",System.currentTimeMillis()))
  init{viewModelScope.launch{dao.addSource(Source("default"))}}
  fun setInitialAmount(a:Double,d:Long){prefs.edit().putFloat("initialAmount",a.toFloat()).putLong("initialDate",d).apply();initialAmount.value=a;initialDate.value=d}
- fun addExpense(a:Double,d:String,s:String,date:Long=System.currentTimeMillis())=viewModelScope.launch{dao.addSource(Source(s.ifBlank{"default"}));dao.insertTransaction(BudgetTransaction(date,a,d,s.ifBlank{"default"},"EXPENSE"))}
- fun addCredit(a:Double,d:String,s:String,date:Long=System.currentTimeMillis())=viewModelScope.launch{dao.addSource(Source(s.ifBlank{"default"}));dao.insertTransaction(BudgetTransaction(date,a,d,s.ifBlank{"default"},"CREDIT"))}
+ fun addExpense(a:Double,d:String,s:String,date:Long=System.currentTimeMillis())=viewModelScope.launch{dao.addSource(Source(s.ifBlank{"default"}));dao.insertTransaction(BudgetTransaction(date=date,amount=a,description=d,source=s.ifBlank{"default"},type="EXPENSE"))}
+ fun addCredit(a:Double,d:String,s:String,date:Long=System.currentTimeMillis())=viewModelScope.launch{dao.addSource(Source(s.ifBlank{"default"}));dao.insertTransaction(BudgetTransaction(date=date,amount=a,description=d,source=s.ifBlank{"default"},type="CREDIT"))}
  fun delete(t:BudgetTransaction)=viewModelScope.launch{dao.deleteTransaction(t)}
  fun addLoan(n:String,a:Double,rs:Double,pct:Double,date:Long=System.currentTimeMillis())=viewModelScope.launch{dao.insertLoan(Loan(name=n,amount=a,date=date,interestRs=rs,interestPct=pct))}
  fun deleteLoan(l:Loan)=viewModelScope.launch{dao.deleteLoan(l)}
