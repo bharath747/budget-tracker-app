@@ -135,7 +135,7 @@ private val Negative=Color(0xFFC43D4B)
  var s by remember{mutableStateOf("")};var f by remember{mutableStateOf("")};var initial by remember{mutableStateOf("")}
  var showDelete by remember{mutableStateOf(false)}
  val backupLauncher=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")){uri->
-  if(uri!=null) try{context.contentResolver.openOutputStream(uri)?.use{it.write(vm.backupJson().toByteArray())};Toast.makeText(context,"Backup saved",Toast.LENGTH_SHORT).show()}catch(e:Exception){Toast.makeText(context,"Backup failed",Toast.LENGTH_LONG).show()}
+  if(uri!=null) vm.backupJson{json->try{if(json==null)throw IllegalStateException();context.contentResolver.openOutputStream(uri)?.use{it.write(json.toByteArray())};Toast.makeText(context,"Backup saved",Toast.LENGTH_SHORT).show()}catch(e:Exception){Toast.makeText(context,"Backup failed",Toast.LENGTH_LONG).show()}}
  }
  val restoreLauncher=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()){uri->
   if(uri!=null) try{
