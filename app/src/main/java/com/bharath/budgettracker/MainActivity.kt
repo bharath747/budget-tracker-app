@@ -71,7 +71,7 @@ fun BudgetApp(vm:BudgetViewModel=viewModel()){
   item{Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(10.dp)){Summary("You owe",loans.sumOf{it.remaining});Summary("Owed to you",lends.sumOf{it.remaining})}}
   item{Text("Recent activity",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)}
   if(tx.isEmpty()) item{Text("No transactions yet",color=MaterialTheme.colorScheme.onSurfaceVariant)}
-  else items(tx.take(5),key={it.id}){t->Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(16.dp),colors=CardDefaults.cardColors(containerColor=Color.White)){ListItem(headlineContent={Text(t.description.ifBlank{t.type},maxLines=1)},supportingContent={Text(date(t.date)+" • "+t.source)},trailingContent={Text((if(t.type=="EXPENSE")"−" else "+")+" ₹"+String.format(Locale.getDefault(),"%,.2f",t.amount),color=if(t.type=="EXPENSE")Negative else Positive,fontWeight=FontWeight.Bold)})}}}
+  else items(tx.take(5),key={it.id}){t->Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(16.dp),colors=CardDefaults.cardColors(containerColor=Color.White)){ListItem(headlineContent={Text(t.description.ifBlank{t.type},maxLines=1)},supportingContent={Text(date(t.date)+" • "+t.source)},trailingContent={Text((if(t.type=="EXPENSE")"−" else "+")+" ₹"+String.format(Locale.getDefault(),"%,.2f",t.amount),color=if(t.type=="EXPENSE")Negative else Positive,fontWeight=FontWeight.Bold)})}}
  }
 }
 @Composable fun Summary(t:String,v:Double){
