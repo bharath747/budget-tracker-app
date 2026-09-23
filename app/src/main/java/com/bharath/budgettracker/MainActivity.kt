@@ -14,6 +14,9 @@ import androidx.compose.foundation.lazy.*
 import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.navigation.compose.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -36,37 +39,30 @@ private val Negative=Color(0xFFC43D4B)
  ),content=content)
 }
 
-@Composable fun BudgetApp(vm:BudgetViewModel=viewModel()){
- val nav=rememberNavController()
- val backStack by nav.currentBackStackEntryAsState()
- val route=backStack?.destination?.route?:"dashboard"
+@Composable
+fun BudgetApp(vm:BudgetViewModel=viewModel()){
+ val navController=rememberNavController()
+ val backStack by navController.currentBackStackEntryAsState()
+ val route=backStack?.destination?.route ?: "dashboard"
  val items=listOf(
-  Triple("dashboard","Home",Icons.Default.Dashboard),
-  Triple("transactions","Activity",Icons.Default.ReceiptLong),
-  Triple("analytics","Insights",Icons.Default.BarChart),
+  Triple("dashboard","Dashboard",Icons.Default.Dashboard),
+  Triple("transactions","Transactions",Icons.Default.ReceiptLong),
+  Triple("analytics","Analytics",Icons.Default.BarChart),
   Triple("loans","Loans",Icons.Default.AccountBalance),
   Triple("lend","Lend",Icons.Default.Handshake),
   Triple("admin","Settings",Icons.Default.Settings)
  )
- Scaffold(containerColor=Color(0xFFF7F8FC),bottomBar={
-  NavigationBar(containerColor=Color.White,tonalElevation=4.dp){
-   items.forEach{item->
-    NavigationBarItem(selected=route==item.first,onClick={nav.navigate(item.first){popUpTo("dashboard"){saveState=true};launchSingleTop=true;restoreState=true}},
-     icon={Icon(item.third,item.second)},label={Text(item.second)})
-   }
-  }
- }){p->
-  NavHost(nav,"dashboard",Modifier.padding(p).fillMaxSize()){
-   composable("dashboard"){Dashboard(vm)}
-   composable("transactions"){Transactions(vm)}
-   composable("analytics"){Analytics(vm)}
-   composable("loans"){Loans(vm)}
-   composable("lend"){Lend(vm)}
-   composable("admin"){Admin(vm)}
-  }
- }
+ Scaffold(containerColor=Color(0xFFF7F8FC),bottomBar={NavigationBar(containerColor=Color.White,tonalElevation=4.dp){
+  items.forEach{item->NavigationBarItem(selected=route==item.first,onClick={navController.navigate(item.first){popUpTo("dashboard"){saveState=true};launchSingleTop=true;restoreState=true}},icon={Icon(item.third,item.second)},label={Text(item.second)})}
+ }}){padding->NavHost(navController,"dashboard",Modifier.padding(padding).fillMaxSize()){
+  composable("dashboard"){Dashboard(vm)}
+  composable("transactions"){Transactions(vm)}
+  composable("analytics"){Analytics(vm)}
+  composable("loans"){Loans(vm)}
+  composable("lend"){Lend(vm)}
+  composable("admin"){Admin(vm)}
+ }}
 }
-
 @Composable fun Dashboard(vm:BudgetViewModel){
  val c by vm.credits.collectAsState(0.0);val e by vm.expenses.collectAsState(0.0);val loans by vm.loans.collectAsState(emptyList());val lends by vm.lendings.collectAsState(emptyList());val initial by vm.initialAmount.collectAsState();val tx by vm.transactions.collectAsState(emptyList())
  val balance=initial+c-e
