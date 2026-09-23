@@ -1,0 +1,23 @@
+package com.bharath.budgettracker
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.bharath.budgettracker.data.*
+import java.text.SimpleDateFormat
+import java.util.*
+class MainActivity:ComponentActivity(){override fun onCreate(b:Bundle?){super.onCreate(b);setContent{MaterialTheme{BudgetApp()}}}}
+@Composable fun BudgetApp(vm:BudgetViewModel=viewModel()){var tab by remember{mutableIntStateOf(0)};Scaffold(bottomBar={NavigationBar{listOf("Dashboard","Transactions","Loans","Lend").forEachIndexed{i,label->NavigationBarItem(selected=tab==i,onClick={tab=i},icon={},label={Text(label)})}}}){p->Box(Modifier.padding(p).fillMaxSize()){when(tab){0->Dashboard(vm);1->Transactions(vm);2->Loans(vm);else->LendPlaceholder()}}}}
+@Composable fun Dashboard(vm:BudgetViewModel){val c by vm.credits.collectAsState(0.0);val e by vm.expenses.collectAsState(0.0);Column(Modifier.padding(20.dp),verticalArrangement=Arrangement.spacedBy(14.dp)){Text("Budget Tracker",style=MaterialTheme.typography.headlineMedium);Card(Modifier.fillMaxWidth()){Column(Modifier.padding(18.dp)){Text("Balance");Text("₹ %.2f".format(c-e),style=MaterialTheme.typography.headlineSmall)}};Text("Credits  ₹ %.2f".format(c));Text("Expenses ₹ %.2f".format(e));Text("Local-first • data stays on this device",style=MaterialTheme.typography.bodySmall)}}
+@Composable fun Transactions(vm:BudgetViewModel){val list by vm.transactions.collectAsState(emptyList());var show by remember{mutableStateOf(false)};Column(Modifier.padding(16.dp)){Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Text("Transactions",style=MaterialTheme.typography.headlineSmall);Button({show=true}){Text("Add")}};LazyColumn(Modifier.weight(1f)){items(list){t->ListItem(headlineContent={Text(t.description.ifBlank{t.type})},supportingContent={Text(date(t.date)+" • "+t.source)},trailingContent={Text((if(t.type=="EXPENSE")"-" else "+")+" ₹"+"%.2f".format(t.amount))})}}};if(show)TransactionDialog({show=false},vm)}}
+@Composable fun TransactionDialog(close:()->Unit,vm:BudgetViewModel){var a by remember{mutableStateOf("")};var d by remember{mutableStateOf("")};var s by remember{mutableStateOf("default")};var credit by remember{mutableStateOf(false)};AlertDialog(onDismissRequest=close,title={Text(if(credit)"Add Credit" else "Add Expense")},text={Column{OutlinedTextField(a,{a=it},label={Text("Amount")});OutlinedTextField(d,{d=it},label={Text("Description")});OutlinedTextField(s,{s=it},label={Text("Source")});Row{Checkbox(credit,{credit=!credit});Text("Credit",Modifier.padding(top=12.dp))}}},confirmButton={Button({a.toDoubleOrNull()?.let{if(credit)vm.addCredit(it,d,s)else vm.addExpense(it,d,s)};close()}){Text("Save")}},dismissButton={TextButton(close){Text("Cancel")}})}
+@Composable fun Loans(vm:BudgetViewModel){val loans by vm.loans.collectAsState(emptyList());var show by remember{mutableStateOf(false)};Column(Modifier.padding(16.dp)){Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Text("Loans",style=MaterialTheme.typography.headlineSmall);Button({show=true}){Text("Add Loan")}};LazyColumn(Modifier.weight(1f)){items(loans){l->Card(Modifier.fillMaxWidth().padding(vertical=5.dp)){Column(Modifier.padding(14.dp)){Text(l.name,style=MaterialTheme.typography.titleMedium);Text("Original ₹%.2f • Remaining ₹%.2f".format(l.amount,l.remaining));Text("Accrued interest ₹%.2f".format(vm.interest(l)));TextButton({vm.deleteLoan(l)}){Text("Delete")}}}}};if(show)LoanDialog({show=false},vm)}}
+@Composable fun LoanDialog(close:()->Unit,vm:BudgetViewModel){var n by remember{mutableStateOf("")};var a by remember{mutableStateOf("")};var r by remember{mutableStateOf("")};AlertDialog(onDismissRequest=close,title={Text("Add Loan")},text={Column{OutlinedTextField(n,{n=it},label={Text("Loan name")});OutlinedTextField(a,{a=it},label={Text("Amount")});OutlinedTextField(r,{r=it},label={Text("Annual interest %")})}},confirmButton={Button({a.toDoubleOrNull()?.let{vm.addLoan(n,it,r.toDoubleOrNull()?:0.0)};close()}){Text("Save")}},dismissButton={TextButton(close){Text("Cancel")}})}
+@Composable fun LendPlaceholder(){Column(Modifier.padding(20.dp)){Text("Lend",style=MaterialTheme.typography.headlineMedium);Text("Lending will mirror the PWA: lent amount, interest, received principal/interest, pending and completed filters.")}}
+fun date(ms:Long)=SimpleDateFormat("dd MMM yyyy",Locale.getDefault()).format(Date(ms))
