@@ -30,7 +30,7 @@ private val Brand=Color(0xFF315DFF)
 private val Positive=Color(0xFF16845B)
 private val Negative=Color(0xFFC43D4B)
 
-@Composable private fun BudgetTheme(content:@Composable()->Unit){
+@Composable private fun BudgetTheme(content: @Composable () -> Unit){
  MaterialTheme(colorScheme=lightColorScheme(
   primary=Brand,onPrimary=Color.White,primaryContainer=Color(0xFFE8EDFF),
   background=Color(0xFFF7F8FC),surface=Color.White,surfaceVariant=Color(0xFFF0F2F7),error=Negative
