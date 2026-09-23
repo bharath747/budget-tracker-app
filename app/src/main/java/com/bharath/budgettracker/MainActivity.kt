@@ -123,4 +123,4 @@ class MainActivity:ComponentActivity(){override fun onCreate(b:Bundle?){super.on
   confirmButton={Button({showDelete=false;vm.deleteAllData{ok->Toast.makeText(context,if(ok)"All data deleted" else "Delete failed",Toast.LENGTH_LONG).show()}}){Text("Delete permanently")}},
   dismissButton={TextButton({showDelete=false}){Text("Cancel")}}
  )
-})
+}
