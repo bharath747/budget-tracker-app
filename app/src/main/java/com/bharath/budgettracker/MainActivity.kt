@@ -7,29 +7,87 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.*
 import androidx.compose.material3.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.compose.*
 import com.bharath.budgettracker.data.*
 import java.text.SimpleDateFormat
 import java.util.*
 
-class MainActivity:ComponentActivity(){override fun onCreate(b:Bundle?){super.onCreate(b);setContent{MaterialTheme{BudgetApp()}}}}
+class MainActivity:ComponentActivity(){override fun onCreate(b:Bundle?){super.onCreate(b);setContent{BudgetTheme{BudgetApp()}}}}
+
+private val Brand=Color(0xFF315DFF)
+private val Positive=Color(0xFF16845B)
+private val Negative=Color(0xFFC43D4B)
+
+@Composable private fun BudgetTheme(content:@Composable()->Unit){
+ MaterialTheme(colorScheme=lightColorScheme(
+  primary=Brand,onPrimary=Color.White,primaryContainer=Color(0xFFE8EDFF),
+  background=Color(0xFFF7F8FC),surface=Color.White,surfaceVariant=Color(0xFFF0F2F7),error=Negative
+ ),content=content)
+}
 
 @Composable fun BudgetApp(vm:BudgetViewModel=viewModel()){
- var tab by remember{mutableIntStateOf(0)}
- Scaffold(bottomBar={NavigationBar{listOf("Dashboard","Transactions","Analytics","Loans","Lend","Admin").forEachIndexed{i,label->NavigationBarItem(selected=tab==i,onClick={tab=i},icon={},label={Text(label)})}}}){p->
-  Box(Modifier.padding(p).fillMaxSize()){when(tab){0->Dashboard(vm);1->Transactions(vm);2->Analytics(vm);3->Loans(vm);4->Lend(vm);else->Admin(vm)}}
+ val nav=rememberNavController()
+ val backStack by nav.currentBackStackEntryAsState()
+ val route=backStack?.destination?.route?:"dashboard"
+ val items=listOf(
+  Triple("dashboard","Home",Icons.Default.Dashboard),
+  Triple("transactions","Activity",Icons.Default.ReceiptLong),
+  Triple("analytics","Insights",Icons.Default.BarChart),
+  Triple("loans","Loans",Icons.Default.AccountBalance),
+  Triple("lend","Lend",Icons.Default.Handshake),
+  Triple("admin","Settings",Icons.Default.Settings)
+ )
+ Scaffold(containerColor=Color(0xFFF7F8FC),bottomBar={
+  NavigationBar(containerColor=Color.White,tonalElevation=4.dp){
+   items.forEach{item->
+    NavigationBarItem(selected=route==item.first,onClick={nav.navigate(item.first){popUpTo("dashboard"){saveState=true};launchSingleTop=true;restoreState=true}},
+     icon={Icon(item.third,item.second)},label={Text(item.second)})
+   }
+  }
+ }){p->
+  NavHost(nav,"dashboard",Modifier.padding(p).fillMaxSize()){
+   composable("dashboard"){Dashboard(vm)}
+   composable("transactions"){Transactions(vm)}
+   composable("analytics"){Analytics(vm)}
+   composable("loans"){Loans(vm)}
+   composable("lend"){Lend(vm)}
+   composable("admin"){Admin(vm)}
+  }
  }
 }
+
 @Composable fun Dashboard(vm:BudgetViewModel){
- val c by vm.credits.collectAsState(0.0);val e by vm.expenses.collectAsState(0.0);val loans by vm.loans.collectAsState(emptyList());val lends by vm.lendings.collectAsState(emptyList());val initial by vm.initialAmount.collectAsState()
- Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){Text("Budget Tracker",style=MaterialTheme.typography.headlineMedium);Summary("Initial Balance",initial);Summary("Current Balance",initial+c-e);Summary("Credits",c);Summary("Expenses",e);Summary("Loans pending",loans.sumOf{it.remaining});Summary("Lend pending",lends.sumOf{it.remaining})}
+ val c by vm.credits.collectAsState(0.0);val e by vm.expenses.collectAsState(0.0);val loans by vm.loans.collectAsState(emptyList());val lends by vm.lendings.collectAsState(emptyList());val initial by vm.initialAmount.collectAsState();val tx by vm.transactions.collectAsState(emptyList())
+ val balance=initial+c-e
+ LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(14.dp)){
+  item{Column(verticalArrangement=Arrangement.spacedBy(4.dp)){Text("Budget overview",style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold);Text("Your personal financial control center",color=MaterialTheme.colorScheme.onSurfaceVariant)}}
+  item{Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(26.dp),colors=CardDefaults.cardColors(containerColor=Brand)){Column(Modifier.padding(22.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){Text("Available balance",color=Color.White.copy(alpha=.8f));Text("₹ "+String.format(Locale.getDefault(),"%,.2f",balance),color=Color.White,style=MaterialTheme.typography.headlineLarge,fontWeight=FontWeight.Bold);Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Text("Income ₹"+String.format(Locale.getDefault(),"%,.0f",c),color=Color.White.copy(alpha=.8f));Text("Spent ₹"+String.format(Locale.getDefault(),"%,.0f",e),color=Color.White.copy(alpha=.8f))}}}}
+  item{Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(10.dp)){Summary("Income",c);Summary("Expenses",e)}}
+  item{Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(10.dp)){Summary("You owe",loans.sumOf{it.remaining});Summary("Owed to you",lends.sumOf{it.remaining})}}
+  item{Text("Recent activity",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)}
+  if(tx.isEmpty()) item{Text("No transactions yet",color=MaterialTheme.colorScheme.onSurfaceVariant)}
+  else items(tx.take(5),key={it.id}){t->Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(16.dp),colors=CardDefaults.cardColors(containerColor=Color.White)){ListItem(headlineContent={Text(t.description.ifBlank{t.type},maxLines=1)},supportingContent={Text(date(t.date)+" • "+t.source)},trailingContent={Text((if(t.type=="EXPENSE")"−" else "+")+" ₹"+String.format(Locale.getDefault(),"%,.2f",t.amount),color=if(t.type=="EXPENSE")Negative else Positive,fontWeight=FontWeight.Bold)})}}}
+ }
 }
-@Composable fun Summary(t:String,v:Double){Card(Modifier.fillMaxWidth()){Column(Modifier.padding(14.dp)){Text(t);Text("₹ %.2f".format(v),style=MaterialTheme.typography.titleLarge)}}}
+@Composable fun Summary(t:String,v:Double){
+ Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(18.dp),colors=CardDefaults.cardColors(containerColor=Color.White)){
+  Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
+   Text(t,style=MaterialTheme.typography.labelLarge,color=MaterialTheme.colorScheme.onSurfaceVariant)
+   Text("₹ "+String.format(Locale.getDefault(),"%,.2f",v),style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
+  }
+ }
+}
 @Composable fun Transactions(vm:BudgetViewModel){
  val list by vm.transactions.collectAsState(emptyList());var show by remember{mutableStateOf(false)}
  Column(Modifier.padding(12.dp)){Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Text("Transactions",style=MaterialTheme.typography.headlineSmall);Button({show=true}){Text("Add")}}
