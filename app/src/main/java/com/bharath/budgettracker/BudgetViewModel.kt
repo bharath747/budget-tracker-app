@@ -6,7 +6,8 @@ import androidx.lifecycle.viewModelScope
 import com.bharath.budgettracker.data.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -40,17 +41,20 @@ class BudgetViewModel(app:Application):AndroidViewModel(app){
  fun addFilter(s:String)=viewModelScope.launch{if(s.isNotBlank())dao.addFilter(FilterWord(s.trim()))}
  fun deleteFilter(f:FilterWord)=viewModelScope.launch{dao.deleteFilter(f)}
  fun interest(from:Long,to:Long,remaining:Double,rs:Double,pct:Double):Double{val days=((to-from)/86400000.0).coerceAtLeast(0.0);return if(pct>0)remaining*pct/100*days/365 else rs*days/30}
- fun backupJson():String = runBlocking {
-  val tx=dao.transactions().first(); val ls=dao.loans().first(); val ld=dao.lendings().first()
-  val root=JSONObject().put("version",1).put("initialAmount",initialAmount.value).put("initialDate",initialDate.value)
-  root.put("transactions",JSONArray().also{a->tx.forEach{t->a.put(JSONObject().put("id",t.id).put("date",t.date).put("amount",t.amount).put("description",t.description).put("source",t.source).put("type",t.type))}})
-  root.put("loans",JSONArray().also{a->ls.forEach{l->a.put(JSONObject().put("id",l.id).put("name",l.name).put("amount",l.amount).put("date",l.date).put("interestRs",l.interestRs).put("interestPct",l.interestPct).put("remaining",l.remaining).put("lastInterestPaid",l.lastInterestPaid))}})
-  root.put("loanPayments",JSONArray().also{a->ls.forEach{l->dao.loanPayments(l.id).first().forEach{p->a.put(JSONObject().put("id",p.id).put("loanId",p.loanId).put("date",p.date).put("principal",p.principal).put("interest",p.interest))}}})
-  root.put("lendings",JSONArray().also{a->ld.forEach{l->a.put(JSONObject().put("id",l.id).put("name",l.name).put("amount",l.amount).put("date",l.date).put("interestRs",l.interestRs).put("interestPct",l.interestPct).put("remaining",l.remaining).put("lastInterestPaid",l.lastInterestPaid))}})
-  root.put("lendingPayments",JSONArray().also{a->ld.forEach{l->dao.lendingPayments(l.id).first().forEach{p->a.put(JSONObject().put("id",p.id).put("lendingId",p.lendingId).put("date",p.date).put("principal",p.principal).put("interest",p.interest))}}})
-  root.put("sources",JSONArray().also{a->dao.sources().first().forEach{a.put(JSONObject().put("name",it.name))}})
-  root.put("filters",JSONArray().also{a->dao.filters().first().forEach{a.put(JSONObject().put("word",it.word))}})
-  root.toString(2)
+ fun backupJson(onDone:(String?)->Unit)=viewModelScope.launch(Dispatchers.IO){
+  try {
+   val tx=dao.transactions().first(); val ls=dao.loans().first(); val ld=dao.lendings().first()
+   val root=JSONObject().put("version",1).put("initialAmount",initialAmount.value).put("initialDate",initialDate.value)
+   root.put("transactions",JSONArray().also{a->tx.forEach{t->a.put(JSONObject().put("id",t.id).put("date",t.date).put("amount",t.amount).put("description",t.description).put("source",t.source).put("type",t.type))}})
+   root.put("loans",JSONArray().also{a->ls.forEach{l->a.put(JSONObject().put("id",l.id).put("name",l.name).put("amount",l.amount).put("date",l.date).put("interestRs",l.interestRs).put("interestPct",l.interestPct).put("remaining",l.remaining).put("lastInterestPaid",l.lastInterestPaid))}})
+   root.put("loanPayments",JSONArray().also{a->ls.forEach{l->dao.loanPayments(l.id).first().forEach{p->a.put(JSONObject().put("id",p.id).put("loanId",p.loanId).put("date",p.date).put("principal",p.principal).put("interest",p.interest))}}})
+   root.put("lendings",JSONArray().also{a->ld.forEach{l->a.put(JSONObject().put("id",l.id).put("name",l.name).put("amount",l.amount).put("date",l.date).put("interestRs",l.interestRs).put("interestPct",l.interestPct).put("remaining",l.remaining).put("lastInterestPaid",l.lastInterestPaid))}})
+   root.put("lendingPayments",JSONArray().also{a->ld.forEach{l->dao.lendingPayments(l.id).first().forEach{p->a.put(JSONObject().put("id",p.id).put("lendingId",p.lendingId).put("date",p.date).put("principal",p.principal).put("interest",p.interest))}}})
+   root.put("sources",JSONArray().also{a->dao.sources().first().forEach{a.put(JSONObject().put("name",it.name))}})
+   root.put("filters",JSONArray().also{a->dao.filters().first().forEach{a.put(JSONObject().put("word",it.word))}})
+   val json=root.toString(2)
+   withContext(Dispatchers.Main){onDone(json)}
+  } catch(_:Exception) { withContext(Dispatchers.Main){onDone(null)} }
  }
  fun restoreJson(json:String,onDone:(Boolean,String)->Unit)=viewModelScope.launch{
   try{
