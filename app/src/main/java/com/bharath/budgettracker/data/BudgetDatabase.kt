@@ -1,9 +1,28 @@
 package com.bharath.budgettracker.data
 import androidx.room.*
 import kotlinx.coroutines.flow.Flow
-@Entity(tableName="transactions") data class BudgetTransaction(@PrimaryKey(autoGenerate=true) val id:Long=0,val date:Long,val amount:Double,val description:String,val source:String,val type:String)
-@Entity(tableName="loans") data class Loan(@PrimaryKey(autoGenerate=true) val id:Long=0,val name:String,val amount:Double,val date:Long,val interestRs:Double=0.0,val interestPct:Double=0.0,val remaining:Double=amount)
-@Entity(tableName="loan_payments") data class LoanPayment(@PrimaryKey(autoGenerate=true) val id:Long=0,val loanId:Long,val date:Long,val principal:Double=0.0,val interest:Double=0.0)
+
+@Entity(tableName="transactions")
+data class BudgetTransaction(@PrimaryKey(autoGenerate=true) val id:Long=0,val date:Long,val amount:Double,val description:String,val source:String,val type:String)
+
+@Entity(tableName="loans")
+data class Loan(@PrimaryKey(autoGenerate=true) val id:Long=0,val name:String,val amount:Double,val date:Long,val interestRs:Double=0.0,val interestPct:Double=0.0,val remaining:Double=amount,val lastInterestPaid:Long=date)
+
+@Entity(tableName="loan_payments")
+data class LoanPayment(@PrimaryKey(autoGenerate=true) val id:Long=0,val loanId:Long,val date:Long,val principal:Double=0.0,val interest:Double=0.0)
+
+@Entity(tableName="lendings")
+data class Lending(@PrimaryKey(autoGenerate=true) val id:Long=0,val name:String,val amount:Double,val date:Long,val interestRs:Double=0.0,val interestPct:Double=0.0,val remaining:Double=amount,val lastInterestPaid:Long=date)
+
+@Entity(tableName="lending_payments")
+data class LendingPayment(@PrimaryKey(autoGenerate=true) val id:Long=0,val lendingId:Long,val date:Long,val principal:Double=0.0,val interest:Double=0.0)
+
+@Entity(tableName="sources")
+data class Source(@PrimaryKey val name:String)
+
+@Entity(tableName="filters")
+data class FilterWord(@PrimaryKey val word:String)
+
 @Dao interface BudgetDao {
  @Query("SELECT * FROM transactions ORDER BY date DESC,id DESC") fun transactions():Flow<List<BudgetTransaction>>
  @Insert suspend fun insertTransaction(t:BudgetTransaction)
@@ -13,10 +32,25 @@ import kotlinx.coroutines.flow.Flow
  @Query("SELECT * FROM loans ORDER BY date DESC") fun loans():Flow<List<Loan>>
  @Insert suspend fun insertLoan(l:Loan):Long
  @Delete suspend fun deleteLoan(l:Loan)
- @Insert suspend fun insertPayment(p:LoanPayment)
- @Query("UPDATE loans SET remaining = remaining - :principal WHERE id=:loanId") suspend fun reduceLoan(loanId:Long,principal:Double)
+ @Query("UPDATE loans SET remaining=remaining-:principal,lastInterestPaid=:date WHERE id=:loanId") suspend fun reduceLoan(loanId:Long,principal:Double,date:Long)
+ @Query("SELECT * FROM loan_payments WHERE loanId=:loanId ORDER BY date DESC") fun loanPayments(loanId:Long):Flow<List<LoanPayment>>
+ @Insert suspend fun insertLoanPayment(p:LoanPayment)
+ @Query("DELETE FROM loan_payments WHERE id=:id") suspend fun deleteLoanPayment(id:Long)
+ @Query("SELECT * FROM lendings ORDER BY date DESC") fun lendings():Flow<List<Lending>>
+ @Insert suspend fun insertLending(l:Lending):Long
+ @Delete suspend fun deleteLending(l:Lending)
+ @Query("UPDATE lendings SET remaining=remaining-:principal,lastInterestPaid=:date WHERE id=:id") suspend fun reduceLending(id:Long,principal:Double,date:Long)
+ @Query("SELECT * FROM lending_payments WHERE lendingId=:id ORDER BY date DESC") fun lendingPayments(id:Long):Flow<List<LendingPayment>>
+ @Insert suspend fun insertLendingPayment(p:LendingPayment)
+ @Query("DELETE FROM lending_payments WHERE id=:id") suspend fun deleteLendingPayment(id:Long)
+ @Query("SELECT * FROM sources ORDER BY name") fun sources():Flow<List<Source>>
+ @Insert(onConflict=OnConflictStrategy.IGNORE) suspend fun addSource(s:Source)
+ @Delete suspend fun deleteSource(s:Source)
+ @Query("SELECT * FROM filters ORDER BY word") fun filters():Flow<List<FilterWord>>
+ @Insert(onConflict=OnConflictStrategy.IGNORE) suspend fun addFilter(f:FilterWord)
+ @Delete suspend fun deleteFilter(f:FilterWord)
 }
-@Database(entities=[BudgetTransaction::class,Loan::class,LoanPayment::class],version=1,exportSchema=false)
+@Database(entities=[BudgetTransaction::class,Loan::class,LoanPayment::class,Lending::class,LendingPayment::class,Source::class,FilterWord::class],version=2,exportSchema=false)
 abstract class BudgetDatabase:RoomDatabase(){ abstract fun dao():BudgetDao
  companion object { @Volatile private var INSTANCE:BudgetDatabase?=null
- fun get(context:android.content.Context)=INSTANCE?:synchronized(this){INSTANCE?:Room.databaseBuilder(context.applicationContext,BudgetDatabase::class.java,"budget-tracker.db").build().also{INSTANCE=it}} } }
+ fun get(context:android.content.Context)=INSTANCE?:synchronized(this){INSTANCE?:Room.databaseBuilder(context.applicationContext,BudgetDatabase::class.java,"budget-tracker.db").fallbackToDestructiveMigration().build().also{INSTANCE=it}} } }
