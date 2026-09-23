@@ -74,6 +74,8 @@ fun BudgetApp(vm:BudgetViewModel=viewModel()){
   else items(tx.take(5),key={it.id}){t->Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(16.dp),colors=CardDefaults.cardColors(containerColor=Color.White)){ListItem(headlineContent={Text(t.description.ifBlank{t.type},maxLines=1)},supportingContent={Text(date(t.date)+" • "+t.source)},trailingContent={Text((if(t.type=="EXPENSE")"−" else "+")+" ₹"+String.format(Locale.getDefault(),"%,.2f",t.amount),color=if(t.type=="EXPENSE")Negative else Positive,fontWeight=FontWeight.Bold)})}}
  }
 }
+private fun date(value: Long): String = SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date(value))
+
 @Composable fun Summary(t:String,v:Double){
  Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(18.dp),colors=CardDefaults.cardColors(containerColor=Color.White)){
   Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
