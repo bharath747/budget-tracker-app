@@ -58,7 +58,7 @@ class BudgetViewModel(app:Application):AndroidViewModel(app){
  }
  fun restoreJson(json:String,onDone:(Boolean,String)->Unit)=viewModelScope.launch{
   try{
-   val r=JSONObject(json); dao.clearAll()
+   val r=JSONObject(json); if(r.optInt("version",-1)!=1) throw IllegalArgumentException("Unsupported backup version")
    val ts=r.optJSONArray("transactions")?.let{a->(0 until a.length()).map{val o=a.getJSONObject(it);BudgetTransaction(o.optLong("id"),o.optLong("date"),o.optDouble("amount"),o.optString("description"),o.optString("source","default"),o.optString("type"))}}?:emptyList()
    val ls=r.optJSONArray("loans")?.let{a->(0 until a.length()).map{val o=a.getJSONObject(it);Loan(o.optLong("id"),o.optString("name"),o.optDouble("amount"),o.optLong("date"),o.optDouble("interestRs"),o.optDouble("interestPct"),o.optDouble("remaining",o.optDouble("amount")),o.optLong("lastInterestPaid",o.optLong("date")))}}?:emptyList()
    val lp=r.optJSONArray("loanPayments")?.let{a->(0 until a.length()).map{val o=a.getJSONObject(it);LoanPayment(o.optLong("id"),o.optLong("loanId"),o.optLong("date"),o.optDouble("principal"),o.optDouble("interest"))}}?:emptyList()
@@ -66,6 +66,7 @@ class BudgetViewModel(app:Application):AndroidViewModel(app){
    val ldp=r.optJSONArray("lendingPayments")?.let{a->(0 until a.length()).map{val o=a.getJSONObject(it);LendingPayment(o.optLong("id"),o.optLong("lendingId"),o.optLong("date"),o.optDouble("principal"),o.optDouble("interest"))}}?:emptyList()
    val ss=r.optJSONArray("sources")?.let{a->(0 until a.length()).map{Source(a.getJSONObject(it).optString("name"))}}?:emptyList()
    val fs=r.optJSONArray("filters")?.let{a->(0 until a.length()).map{FilterWord(a.getJSONObject(it).optString("word"))}}?:emptyList()
+   dao.clearAll()
    dao.insertTransactions(ts);dao.insertLoans(ls);dao.insertLoanPayments(lp);dao.insertLendings(ld);dao.insertLendingPayments(ldp);dao.addSources(ss);dao.addFilters(fs)
    setInitialAmount(r.optDouble("initialAmount",0.0),r.optLong("initialDate",System.currentTimeMillis()));dao.addSource(Source("default"));onDone(true,"Data restored successfully")
   }catch(e:Exception){onDone(false,"Restore failed: "+(e.message?:"Invalid backup file"))}
