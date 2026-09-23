@@ -1,5 +1,5 @@
 package com.bharath.budgettracker.data
-import androidx.room.*
+import androidx.room.*\nimport androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.flow.Flow
 
 @Entity(tableName="transactions")
@@ -65,7 +65,7 @@ data class FilterWord(@PrimaryKey val word:String)
  @Delete suspend fun deleteFilter(f:FilterWord)
  @Transaction suspend fun clearAll(){clearLoanPayments();clearLendingPayments();clearTransactions();clearLoans();clearLendings();clearSources();clearFilters()}
 }
-@Database(entities=[BudgetTransaction::class,Loan::class,LoanPayment::class,Lending::class,LendingPayment::class,Source::class,FilterWord::class],version=2,exportSchema=false)
+@Database(entities=[BudgetTransaction::class,Loan::class,LoanPayment::class,Lending::class,LendingPayment::class,Source::class,FilterWord::class],version=3,exportSchema=false)
 abstract class BudgetDatabase:RoomDatabase(){ abstract fun dao():BudgetDao
- companion object { @Volatile private var INSTANCE:BudgetDatabase?=null
- fun get(context:android.content.Context)=INSTANCE?:synchronized(this){INSTANCE?:Room.databaseBuilder(context.applicationContext,BudgetDatabase::class.java,"budget-tracker.db").fallbackToDestructiveMigration().build().also{INSTANCE=it}} } }
+ companion object {\n @Volatile private var INSTANCE:BudgetDatabase?=null\n private val MIGRATION_2_3=object:Migration(2,3){override fun migrate(db:SupportSQLiteDatabase){db.execSQL("CREATE INDEX IF NOT EXISTS index_transactions_date ON transactions(date)")}}
+ fun get(context:android.content.Context)=INSTANCE?:synchronized(this){INSTANCE?:Room.databaseBuilder(context.applicationContext,BudgetDatabase::class.java,"budget-tracker.db").addMigrations(MIGRATION_2_3).build().also{INSTANCE=it}} } }
