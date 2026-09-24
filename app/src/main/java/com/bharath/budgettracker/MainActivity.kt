@@ -151,7 +151,7 @@ private fun date(value: Long): String = SimpleDateFormat("dd MMM yyyy", Locale.g
    Text("Keep a copy of your transactions, loans, lending records, sources and filters.")
    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)){
     OutlinedButton({backupLauncher.launch("budget-tracker-backup.json")},Modifier.weight(1f)){Text("Backup")}
-    Button({restoreLauncher.launch(arrayOf("application/json","text/plain"))},Modifier.weight(1f)){Text("Restore")}
+    Button({restoreLauncher.launch(arrayOf("*/*"))},Modifier.weight(1f)){Text("Restore")}
    }
   }}
   Card(Modifier.fillMaxWidth()){Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
