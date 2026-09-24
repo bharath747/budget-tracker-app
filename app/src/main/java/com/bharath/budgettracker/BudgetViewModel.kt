@@ -56,16 +56,86 @@ class BudgetViewModel(app:Application):AndroidViewModel(app){
    withContext(Dispatchers.Main){onDone(json)}
   } catch(_:Exception) { withContext(Dispatchers.Main){onDone(null)} }
  }
+ private fun dateMillis(value:Any?):Long{
+  if(value==null) return System.currentTimeMillis()
+  if(value is Number) return value.toLong()
+  val text=value.toString()
+  text.toLongOrNull()?.let{return it}
+  return try{java.time.Instant.parse(text).toEpochMilli()}catch(_:Exception){
+   try{java.text.SimpleDateFormat("EEE MMM dd HH:mm:ss zzz yyyy",java.util.Locale.US).parse(text)?.time ?: System.currentTimeMillis()}
+   catch(_:Exception){System.currentTimeMillis()}
+  }
+ }
  fun restoreJson(json:String,onDone:(Boolean,String)->Unit)=viewModelScope.launch{
   try{
-   val r=JSONObject(json); if(r.optInt("version",-1)!=1) throw IllegalArgumentException("Unsupported backup version")
-   val ts=r.optJSONArray("transactions")?.let{a->(0 until a.length()).map{val o=a.getJSONObject(it);BudgetTransaction(o.optLong("id"),o.optLong("date"),o.optDouble("amount"),o.optString("description"),o.optString("source","default"),o.optString("type"))}}?:emptyList()
-   val ls=r.optJSONArray("loans")?.let{a->(0 until a.length()).map{val o=a.getJSONObject(it);Loan(o.optLong("id"),o.optString("name"),o.optDouble("amount"),o.optLong("date"),o.optDouble("interestRs"),o.optDouble("interestPct"),o.optDouble("remaining",o.optDouble("amount")),o.optLong("lastInterestPaid",o.optLong("date")))}}?:emptyList()
-   val lp=r.optJSONArray("loanPayments")?.let{a->(0 until a.length()).map{val o=a.getJSONObject(it);LoanPayment(o.optLong("id"),o.optLong("loanId"),o.optLong("date"),o.optDouble("principal"),o.optDouble("interest"))}}?:emptyList()
-   val ld=r.optJSONArray("lendings")?.let{a->(0 until a.length()).map{val o=a.getJSONObject(it);Lending(o.optLong("id"),o.optString("name"),o.optDouble("amount"),o.optLong("date"),o.optDouble("interestRs"),o.optDouble("interestPct"),o.optDouble("remaining",o.optDouble("amount")),o.optLong("lastInterestPaid",o.optLong("date")))}}?:emptyList()
-   val ldp=r.optJSONArray("lendingPayments")?.let{a->(0 until a.length()).map{val o=a.getJSONObject(it);LendingPayment(o.optLong("id"),o.optLong("lendingId"),o.optLong("date"),o.optDouble("principal"),o.optDouble("interest"))}}?:emptyList()
-   val ss=r.optJSONArray("sources")?.let{a->(0 until a.length()).map{Source(a.getJSONObject(it).optString("name"))}}?:emptyList()
-   val fs=r.optJSONArray("filters")?.let{a->(0 until a.length()).map{FilterWord(a.getJSONObject(it).optString("word"))}}?:emptyList()
+   val r=JSONObject(json)
+   val versionValue=r.opt("version")
+   val isCurrentBackup=versionValue == null || versionValue.toString().isBlank() ||
+       versionValue.toString().toDoubleOrNull() == 1.0
+   if(!isCurrentBackup){
+    throw IllegalArgumentException("Unsupported backup version $versionValue")
+   }
+   val isLegacyWebBackup=versionValue == null
+   val ts=if(!isLegacyWebBackup) {
+    r.optJSONArray("transactions")?.let{a->(0 until a.length()).map{val o=a.getJSONObject(it);BudgetTransaction(o.optLong("id"),o.optLong("date"),o.optDouble("amount"),o.optString("description"),o.optString("source","default"),o.optString("type"))}}?:emptyList()
+   } else {
+    buildList {
+     val months=r.optJSONArray("month-summary") ?: JSONArray()
+     for(i in 0 until months.length()){
+      val month=months.optJSONObject(i) ?: continue
+      val expenses=month.optJSONArray("expenses") ?: JSONArray()
+      for(j in 0 until expenses.length()){
+       val o=expenses.optJSONObject(j) ?: continue
+       add(BudgetTransaction(0,dateMillis(o.opt("date")),o.optDouble("amount"),o.optString("description"),o.optString("source","default"),"EXPENSE"))
+      }
+      val credits=month.optJSONArray("credits") ?: JSONArray()
+      for(j in 0 until credits.length()){
+       val o=credits.optJSONObject(j) ?: continue
+       add(BudgetTransaction(0,dateMillis(o.opt("date")),o.optDouble("amount"),o.optString("description"),o.optString("source","default"),"CREDIT"))
+      }
+     }
+    }
+   }
+   val ls=if(!isLegacyWebBackup) {
+    r.optJSONArray("loans")?.let{a->(0 until a.length()).map{val o=a.getJSONObject(it);Loan(o.optLong("id"),o.optString("name"),o.optDouble("amount"),o.optLong("date"),o.optDouble("interestRs"),o.optDouble("interestPct"),o.optDouble("remaining",o.optDouble("amount")),o.optLong("lastInterestPaid",o.optLong("date")))}}?:emptyList()
+   } else {
+    r.optJSONArray("loan-summary")?.let{a->(0 until a.length()).map{val o=a.getJSONObject(it);Loan(o.optLong("id"),o.optString("loanName"),o.optDouble("loanAmount"),dateMillis(o.opt("loanDate")),o.optDouble("interestInRs"),o.optDouble("interestInperc"),o.optDouble("loanRemaining",o.optDouble("loanAmount")),dateMillis(o.opt("lastInterestPaid",o.opt("loanDate"))))}}?:emptyList()
+   }
+   val lp=if(!isLegacyWebBackup) {
+    r.optJSONArray("loanPayments")?.let{a->(0 until a.length()).map{val o=a.getJSONObject(it);LoanPayment(o.optLong("id"),o.optLong("loanId"),o.optLong("date"),o.optDouble("principal"),o.optDouble("interest"))}}?:emptyList()
+   } else emptyList()
+   val ld=if(!isLegacyWebBackup) {
+    r.optJSONArray("lendings")?.let{a->(0 until a.length()).map{val o=a.getJSONObject(it);Lending(o.optLong("id"),o.optString("name"),o.optDouble("amount"),o.optLong("date"),o.optDouble("interestRs"),o.optDouble("interestPct"),o.optDouble("remaining",o.optDouble("amount")),o.optLong("lastInterestPaid",o.optLong("date")))}}?:emptyList()
+   } else {
+    r.optJSONArray("lend-summary")?.let{a->(0 until a.length()).map{val o=a.getJSONObject(it);Lending(o.optLong("id"),o.optString("loanName"),o.optDouble("loanAmount"),dateMillis(o.opt("loanDate")),o.optDouble("interestInRs"),o.optDouble("interestInperc"),o.optDouble("loanRemaining",o.optDouble("loanAmount")),dateMillis(o.opt("lastInterestPaid",o.opt("loanDate"))))}}?:emptyList()
+   }
+   val ldp=if(!isLegacyWebBackup) {
+    r.optJSONArray("lendingPayments")?.let{a->(0 until a.length()).map{val o=a.getJSONObject(it);LendingPayment(o.optLong("id"),o.optLong("lendingId"),o.optLong("date"),o.optDouble("principal"),o.optDouble("interest"))}}?:emptyList()
+   } else emptyList()
+   val ss=if(!isLegacyWebBackup) {
+    r.optJSONArray("sources")?.let{a->(0 until a.length()).map{Source(a.getJSONObject(it).optString("name"))}}?:emptyList()
+   } else {
+    buildList {
+     val arrays=r.optJSONArray("source-info")
+     for(i in 0 until (arrays?.length() ?: 0)){
+      val o=arrays?.optJSONObject(i) ?: continue
+      val values=o.optJSONArray("sources") ?: continue
+      for(j in 0 until values.length()) add(Source(values.optString(j)))
+     }
+    }
+   }
+   val fs=if(!isLegacyWebBackup) {
+    r.optJSONArray("filters")?.let{a->(0 until a.length()).map{FilterWord(a.getJSONObject(it).optString("word"))}}?:emptyList()
+   } else {
+    buildList {
+     val arrays=r.optJSONArray("filters-info")
+     for(i in 0 until (arrays?.length() ?: 0)){
+      val o=arrays?.optJSONObject(i) ?: continue
+      val values=o.optJSONArray("filters") ?: continue
+      for(j in 0 until values.length()) add(FilterWord(values.optString(j)))
+     }
+    }
+   }
    dao.clearAll()
    dao.insertTransactions(ts);dao.insertLoans(ls);dao.insertLoanPayments(lp);dao.insertLendings(ld);dao.insertLendingPayments(ldp);dao.addSources(ss);dao.addFilters(fs)
    setInitialAmount(r.optDouble("initialAmount",0.0),r.optLong("initialDate",System.currentTimeMillis()));dao.addSource(Source("default"));onDone(true,"Data restored successfully")
